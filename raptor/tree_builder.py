@@ -6,20 +6,17 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from threading import Lock
 from typing import Dict, List, Optional, Set, Tuple
 
-import openai
 import tiktoken
 from tenacity import retry, stop_after_attempt, wait_random_exponential
 
 from .EmbeddingModels import BaseEmbeddingModel, OpenAIEmbeddingModel
-from .SummarizationModels import (BaseSummarizationModel,
-                                  GPT3TurboSummarizationModel)
+from .SummarizationModels import BaseSummarizationModel, GPT4StandardSummarizationModel
 from .tree_structures import Node, Tree
 from .utils import (distances_from_embeddings, get_children, get_embeddings,
                     get_node_list, get_text,
                     indices_of_nearest_neighbors_from_distances, split_text)
 
 logging.basicConfig(format="%(asctime)s - %(message)s", level=logging.INFO)
-
 
 class TreeBuilderConfig:
     def __init__(
@@ -74,7 +71,7 @@ class TreeBuilderConfig:
         self.summarization_length = summarization_length
 
         if summarization_model is None:
-            summarization_model = GPT3TurboSummarizationModel()
+            summarization_model = GPT4StandardSummarizationModel()
         if not isinstance(summarization_model, BaseSummarizationModel):
             raise ValueError(
                 "summarization_model must be an instance of BaseSummarizationModel"
@@ -198,7 +195,7 @@ class TreeBuilder:
 
         Args:
             context (str, optional): The context to summarize.
-            max_tokens (int, optional): The maximum number of tokens in the generated summary. Defaults to 150.o
+            max_tokens (int, optional): The maximum number of tokens in the generated summary. Defaults to 150.
 
         Returns:
             str: The generated summary.
@@ -309,61 +306,10 @@ class TreeBuilder:
         Args:
             current_level_nodes (Dict[int, Node]): The current set of nodes.
             all_tree_nodes (Dict[int, Node]): The dictionary of all nodes.
+            layer_to_nodes (Dict[int, List[Node]]): Dictionary mapping layers to their nodes.
             use_multithreading (bool): Whether to use multithreading to speed up the process.
 
         Returns:
             Dict[int, Node]: The final set of root nodes.
         """
         pass
-
-        # logging.info("Using Transformer-like TreeBuilder")
-
-        # def process_node(idx, current_level_nodes, new_level_nodes, all_tree_nodes, next_node_index, lock):
-        #     relevant_nodes_chunk = self.get_relevant_nodes(
-        #         current_level_nodes[idx], current_level_nodes
-        #     )
-
-        #     node_texts = get_text(relevant_nodes_chunk)
-
-        #     summarized_text = self.summarize(
-        #         context=node_texts,
-        #         max_tokens=self.summarization_length,
-        #     )
-
-        #     logging.info(
-        #         f"Node Texts Length: {len(self.tokenizer.encode(node_texts))}, Summarized Text Length: {len(self.tokenizer.encode(summarized_text))}"
-        #     )
-
-        #     next_node_index, new_parent_node = self.create_node(
-        #         next_node_index,
-        #         summarized_text,
-        #         {node.index for node in relevant_nodes_chunk}
-        #     )
-
-        #     with lock:
-        #         new_level_nodes[next_node_index] = new_parent_node
-
-        # for layer in range(self.num_layers):
-        #     logging.info(f"Constructing Layer {layer}: ")
-
-        #     node_list_current_layer = get_node_list(current_level_nodes)
-        #     next_node_index = len(all_tree_nodes)
-
-        #     new_level_nodes = {}
-        #     lock = Lock()
-
-        #     if use_multithreading:
-        #         with ThreadPoolExecutor() as executor:
-        #             for idx in range(0, len(node_list_current_layer)):
-        #                 executor.submit(process_node, idx, node_list_current_layer, new_level_nodes, all_tree_nodes, next_node_index, lock)
-        #                 next_node_index += 1
-        #             executor.shutdown(wait=True)
-        #     else:
-        #         for idx in range(0, len(node_list_current_layer)):
-        #             process_node(idx, node_list_current_layer, new_level_nodes, all_tree_nodes, next_node_index, lock)
-
-        #     layer_to_nodes[layer + 1] = list(new_level_nodes.values())
-        #     current_level_nodes = new_level_nodes
-        #     all_tree_nodes.update(new_level_nodes)
-
-        # return new_level_nodes

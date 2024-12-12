@@ -3,7 +3,7 @@ import pickle
 
 from .cluster_tree_builder import ClusterTreeBuilder, ClusterTreeConfig
 from .EmbeddingModels import BaseEmbeddingModel
-from .QAModels import BaseQAModel, GPT3TurboQAModel
+from .QAModels import BaseQAModel, GPT4StandardQAModel
 from .SummarizationModels import BaseSummarizationModel
 from .tree_builder import TreeBuilder, TreeBuilderConfig
 from .tree_retriever import TreeRetriever, TreeRetrieverConfig
@@ -14,17 +14,15 @@ supported_tree_builders = {"cluster": (ClusterTreeBuilder, ClusterTreeConfig)}
 
 logging.basicConfig(format="%(asctime)s - %(message)s", level=logging.INFO)
 
-
 class RetrievalAugmentationConfig:
     def __init__(
         self,
         tree_builder_config=None,
-        tree_retriever_config=None,  # Change from default instantiation
+        tree_retriever_config=None,
         qa_model=None,
         embedding_model=None,
         summarization_model=None,
         tree_builder_type="cluster",
-        # New parameters for TreeRetrieverConfig and TreeBuilderConfig
         # TreeRetrieverConfig arguments
         tr_tokenizer=None,
         tr_threshold=0.5,
@@ -129,7 +127,7 @@ class RetrievalAugmentationConfig:
         # Assign the created configurations to the instance
         self.tree_builder_config = tree_builder_config
         self.tree_retriever_config = tree_retriever_config
-        self.qa_model = qa_model or GPT3TurboQAModel()
+        self.qa_model = qa_model or GPT4StandardQAModel()
         self.tree_builder_type = tree_builder_type
 
     def log_config(self):
@@ -213,7 +211,6 @@ class RetrievalAugmentation:
                 "Warning: Overwriting existing tree. Did you mean to call 'add_to_existing' instead? (y/n): "
             )
             if user_input.lower() == "y":
-                # self.add_to_existing(docs)
                 return
 
         self.tree = self.tree_builder.build_from_text(text=docs)
@@ -230,14 +227,16 @@ class RetrievalAugmentation:
         return_layer_information: bool = True,
     ):
         """
-        Retrieves information and answers a question using the TreeRetriever instance.
+        Retrieves information from the tree based on the question.
 
         Args:
             question (str): The question to answer.
-            start_layer (int): The layer to start from. Defaults to self.start_layer.
-            num_layers (int): The number of layers to traverse. Defaults to self.num_layers.
-            max_tokens (int): The maximum number of tokens. Defaults to 3500.
-            use_all_information (bool): Whether to retrieve information from all nodes. Defaults to False.
+            start_layer (int): The layer to start from.
+            num_layers (int): The number of layers to traverse.
+            top_k (int): Number of top results to return.
+            max_tokens (int): Maximum tokens to process.
+            collapse_tree (bool): Whether to collapse tree information.
+            return_layer_information (bool): Whether to return layer information.
 
         Returns:
             str: The context from which the answer can be found.
@@ -271,14 +270,16 @@ class RetrievalAugmentation:
         return_layer_information: bool = False,
     ):
         """
-        Retrieves information and answers a question using the TreeRetriever instance.
+        Retrieves information and answers a question using the tree and QA model.
 
         Args:
             question (str): The question to answer.
-            start_layer (int): The layer to start from. Defaults to self.start_layer.
-            num_layers (int): The number of layers to traverse. Defaults to self.num_layers.
-            max_tokens (int): The maximum number of tokens. Defaults to 3500.
-            use_all_information (bool): Whether to retrieve information from all nodes. Defaults to False.
+            top_k (int): Number of top results to consider.
+            start_layer (int): The layer to start from.
+            num_layers (int): The number of layers to traverse.
+            max_tokens (int): Maximum tokens to process.
+            collapse_tree (bool): Whether to collapse tree information.
+            return_layer_information (bool): Whether to return layer information.
 
         Returns:
             str: The answer to the question.
@@ -286,7 +287,6 @@ class RetrievalAugmentation:
         Raises:
             ValueError: If the TreeRetriever instance has not been initialized.
         """
-        # if return_layer_information:
         context, layer_information = self.retrieve(
             question, start_layer, num_layers, top_k, max_tokens, collapse_tree, True
         )
@@ -299,6 +299,15 @@ class RetrievalAugmentation:
         return answer
 
     def save(self, path):
+        """
+        Saves the tree to a file.
+
+        Args:
+            path (str): Path where to save the tree.
+            
+        Raises:
+            ValueError: If there is no tree to save.
+        """
         if self.tree is None:
             raise ValueError("There is no tree to save.")
         with open(path, "wb") as file:
